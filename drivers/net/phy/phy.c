@@ -412,7 +412,7 @@ int genphy_config(struct phy_device *phydev)
 	phydev->supported = features;
 	phydev->advertising = features;
 
-	genphy_config_aneg(phydev);
+	//genphy_config_aneg(phydev);
 
 	return 0;
 }
@@ -690,7 +690,7 @@ static struct phy_device *get_phy_device(struct mii_dev *bus, int addr,
 
 int phy_reset(struct phy_device *phydev)
 {
-	int reg;
+	int reg, reg2;
 	int timeout = 500;
 	int devad = MDIO_DEVAD_NONE;
 
@@ -710,34 +710,63 @@ int phy_reset(struct phy_device *phydev)
 		return -1;
 	}
 
-	reg |= BMCR_RESET;
+	reg |= BMCR_ANENABLE;
+	reg |= BMCR_ANRESTART;
+	reg &= ~BMCR_ISOLATE;
 
-	if (phy_write(phydev, devad, MII_BMCR, reg) < 0) {
+	if (phy_write(phydev, devad, MII_BMCR, BMCR_RESET) < 0) {
 		debug("PHY reset failed\n");
 		return -1;
 	}
+	udelay(100000);
+	if (phy_write(phydev, devad, MII_BMCR, reg) < 0) {
+		debug("PHY AUTONEGOTIATE RESTART failed\n");
+		return -1;
+	}
+	udelay(100000);
+	if (phy_write(phydev, devad, MII_BMCR, BMCR_RESET) < 0) {
+		debug("PHY reset failed\n");
+		return -1;
+	}
+	udelay(100000);
+	if (phy_write(phydev, devad, MII_BMCR, reg) < 0) {
+		debug("PHY AUTONEGOTIATE RESTART failed\n");
+		return -1;
+	}
+	udelay(100000);
 
-#ifdef CONFIG_PHY_RESET_DELAY
-	udelay(CONFIG_PHY_RESET_DELAY);	/* Intel LXT971A needs this */
-#endif
-	/*
-	 * Poll the control register for the reset bit to go to 0 (it is
-	 * auto-clearing).  This should happen within 0.5 seconds per the
-	 * IEEE spec.
-	 */
-	while ((reg & BMCR_RESET) && timeout--) {
-		reg = phy_read(phydev, devad, MII_BMCR);
+	reg2 = phy_read(phydev, devad, MII_BMSR);
+	while( !(reg2 & BMSR_ANEGCOMPLETE) ){
+	  debug("Additional Reset\n");
 
-		if (reg < 0) {
-			debug("PHY status read failed\n");
-			return -1;
-		}
-		udelay(1000);
+	  if (phy_write(phydev, devad, MII_BMCR, BMCR_RESET) < 0) {
+	    debug("PHY reset failed\n");
+	    return -1;
+	  }
+	  udelay(100000);
+	  if (phy_write(phydev, devad, MII_BMCR, reg) < 0) {
+	    debug("PHY AUTONEGOTIATE RESTART failed\n");
+	    return -1;
+	  }
+	  udelay(100000);
+	  reg2 = phy_read(phydev, devad, MII_BMSR);
 	}
 
-	if (reg & BMCR_RESET) {
-		puts("PHY reset timed out\n");
-		return -1;
+	debug("Waiting for Link to be up; Polling for SGMII core Reg \n");
+	reg2 = phy_read(phydev, devad, MII_LPA);
+
+	while(!(reg2 & 0x8000)) {
+	  if (phy_write(phydev, devad, MII_BMCR, BMCR_RESET) < 0) {
+	    debug("PHY reset failed\n");
+	    return -1;
+	  }
+	  if (phy_write(phydev, devad, MII_BMCR, reg) < 0) {
+	    debug("PHY AUTONEGOTIATE RESTART failed\n");
+	    return -1;
+	  }
+
+	  udelay(200000);
+	  reg2 = phy_read(phydev, devad, MII_LPA);
 	}
 
 	return 0;

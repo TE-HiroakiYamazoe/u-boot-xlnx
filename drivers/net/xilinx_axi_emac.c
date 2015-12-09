@@ -145,7 +145,7 @@ struct axi_regs {
  *  0x0800: 10Mbps half duplex support
  *  0x0008: Auto-negotiation support
  */
-#define PHY_DETECT_MASK 0x1808
+#define PHY_DETECT_MASK 0x1C8
 
 static inline int mdio_wait(struct eth_device *dev)
 {
@@ -238,6 +238,7 @@ static int setup_phy(struct eth_device *dev)
 		/* Detect the PHY address */
 		for (i = 31; i >= 0; i--) {
 			ret = phyread(dev, i, PHY_DETECT_REG, &phyreg);
+			debug("axiemac: Read MII 0x%x, 0x%x, 0x%x\n", i, PHY_DETECT_REG, phyreg);
 			if (!ret && (phyreg != 0xFFFF) &&
 			((phyreg & PHY_DETECT_MASK) == PHY_DETECT_MASK)) {
 				/* Found a valid PHY address */
