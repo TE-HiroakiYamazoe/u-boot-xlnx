@@ -1,7 +1,7 @@
 /*
  * Xilinx SPI driver
  *
- * supports 8 bit SPI transfers only, with or w/o FIFO
+ * supports 8 bit SPI transfers only, with FIFO
  *
  * based on bfin_spi.c, by way of altera_spi.c
  * Copyright (c) 2005-2008 Analog Devices Inc.
@@ -39,6 +39,7 @@
 					 SPICR_MANUAL_SS)
 
 #define XILSPI_MAX_XFER_BITS		8
+#define XILSPI_FIFO_DEPTH		16
 
 static unsigned long xilinx_spi_base_list[] = CONFIG_SYS_XILINX_SPI_LIST;
 
@@ -181,6 +182,7 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
 	global_timeout = xilspi->freq > XILSPI_MAX_XFER_BITS * 1000000 ? 2 :
 			(XILSPI_MAX_XFER_BITS * 1000000 / xilspi->freq) + 1;
 
+	unsigned xfer_outstanding = 0;
 	while (bytes--) {
 		unsigned timeout = global_timeout;
 		/* get Tx element from data out buffer and count up */
@@ -189,22 +191,32 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
 
 		/* write out and wait for processing (receive data) */
 		writel(d & SPIDTR_8BIT_MASK, &xilspi->regs->spidtr);
-		while (timeout && readl(&xilspi->regs->spisr)
-						& SPISR_RX_EMPTY) {
-			timeout--;
-			udelay(1);
-		}
+		xfer_outstanding++;
 
-		if (!timeout) {
-			printf("XILSPI error: %s: Xfer timeout\n", __func__);
-			return -1;
-		}
+		if( (xfer_outstanding == XILSPI_FIFO_DEPTH) || (bytes == 0) ){
+		  while( xfer_outstanding ){
+		    while (timeout && readl(&xilspi->regs->spisr) & SPISR_RX_EMPTY) {
+		      timeout--;
+		      udelay(1);
+		    }
 
-		/* read Rx element and push into data in buffer */
-		d = readl(&xilspi->regs->spidrr) & SPIDRR_8BIT_MASK;
-		if (rxp)
+		    if (!timeout) {
+		      printf("XILSPI error: %s: Xfer timeout\n", __func__);
+		      return -1;
+		    }
+
+		    u32 rfifo_data_num = readl(&xilspi->regs->spirfor) + 1;
+		    xfer_outstanding -= rfifo_data_num;
+
+		    while( rfifo_data_num-- ){
+		      /* read Rx element and push into data in buffer */
+		      d = readl(&xilspi->regs->spidrr) & SPIDRR_8BIT_MASK;
+		      if (rxp)
 			*rxp++ = d;
-		debug("rx:%x\n", d);
+		      debug("rx:%x\n", d);
+		    }
+		  }
+		}
 	}
 
  done:
