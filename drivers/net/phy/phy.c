@@ -275,91 +275,20 @@ int genphy_update_link(struct phy_device *phydev)
  */
 int genphy_parse_link(struct phy_device *phydev)
 {
-	int mii_reg = phy_read(phydev, MDIO_DEVAD_NONE, MII_BMSR);
-
 	/* We're using autonegotiation */
-	if (phydev->supported & SUPPORTED_Autoneg) {
-		u32 lpa = 0;
-		int gblpa = 0;
-		u32 estatus = 0;
+	u32 lpa = phy_read(phydev, MDIO_DEVAD_NONE, MII_LPA);
 
-		/* Check for gigabit capability */
-		if (phydev->supported & (SUPPORTED_1000baseT_Full |
-					SUPPORTED_1000baseT_Half)) {
-			/* We want a list of states supported by
-			 * both PHYs in the link
-			 */
-			gblpa = phy_read(phydev, MDIO_DEVAD_NONE, MII_STAT1000);
-			if (gblpa < 0) {
-				debug("Could not read MII_STAT1000. Ignoring gigabit capability\n");
-				gblpa = 0;
-			}
-			gblpa &= phy_read(phydev,
-					MDIO_DEVAD_NONE, MII_CTRL1000) << 2;
-		}
+	if(lpa & 0x1000)
+	  phydev->duplex = DUPLEX_FULL;
+	else
+	  phydev->duplex = DUPLEX_HALF;
 
-		/* Set the baseline so we only have to set them
-		 * if they're different
-		 */
-		phydev->speed = SPEED_10;
-		phydev->duplex = DUPLEX_HALF;
-
-		/* Check the gigabit fields */
-		if (gblpa & (PHY_1000BTSR_1000FD | PHY_1000BTSR_1000HD)) {
-			phydev->speed = SPEED_1000;
-
-			if (gblpa & PHY_1000BTSR_1000FD)
-				phydev->duplex = DUPLEX_FULL;
-
-			/* We're done! */
-			return 0;
-		}
-
-		lpa = phy_read(phydev, MDIO_DEVAD_NONE, MII_ADVERTISE);
-		lpa &= phy_read(phydev, MDIO_DEVAD_NONE, MII_LPA);
-
-		if (lpa & (LPA_100FULL | LPA_100HALF)) {
-			phydev->speed = SPEED_100;
-
-			if (lpa & LPA_100FULL)
-				phydev->duplex = DUPLEX_FULL;
-
-		} else if (lpa & LPA_10FULL)
-			phydev->duplex = DUPLEX_FULL;
-
-		/*
-		 * Extended status may indicate that the PHY supports
-		 * 1000BASE-T/X even though the 1000BASE-T registers
-		 * are missing. In this case we can't tell whether the
-		 * peer also supports it, so we only check extended
-		 * status if the 1000BASE-T registers are actually
-		 * missing.
-		 */
-		if ((mii_reg & BMSR_ESTATEN) && !(mii_reg & BMSR_ERCAP))
-			estatus = phy_read(phydev, MDIO_DEVAD_NONE,
-					   MII_ESTATUS);
-
-		if (estatus & (ESTATUS_1000_XFULL | ESTATUS_1000_XHALF |
-				ESTATUS_1000_TFULL | ESTATUS_1000_THALF)) {
-			phydev->speed = SPEED_1000;
-			if (estatus & (ESTATUS_1000_XFULL | ESTATUS_1000_TFULL))
-				phydev->duplex = DUPLEX_FULL;
-		}
-
-	} else {
-		u32 bmcr = phy_read(phydev, MDIO_DEVAD_NONE, MII_BMCR);
-
-		phydev->speed = SPEED_10;
-		phydev->duplex = DUPLEX_HALF;
-
-		if (bmcr & BMCR_FULLDPLX)
-			phydev->duplex = DUPLEX_FULL;
-
-		if (bmcr & BMCR_SPEED1000)
-			phydev->speed = SPEED_1000;
-		else if (bmcr & BMCR_SPEED100)
-			phydev->speed = SPEED_100;
-	}
+	if((lpa & 0x0C00) == 0x0800)
+	  phydev->speed = SPEED_1000;
+	else if((lpa & 0x0C00) == 0x0400)
+	  phydev->speed = SPEED_100;
+	else
+	  phydev->speed = SPEED_10;
 
 	return 0;
 }

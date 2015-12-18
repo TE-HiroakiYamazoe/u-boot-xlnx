@@ -280,6 +280,7 @@ static int setup_phy(struct eth_device *dev)
 	default:
 		return 0;
 	}
+	debug("axiemac: Link Speed = %d Mbps\n", phydev->speed);
 
 	/* Setup the emac for the phy speed */
 	emmc_reg = in_be32(&regs->emmc);
