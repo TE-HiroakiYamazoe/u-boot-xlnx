@@ -282,6 +282,35 @@ U_BOOT_CMD(
 	"send ICMP ECHO_REQUEST to network host",
 	"pingAddress"
 );
+static int do_checketh(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	int result;
+	if (argc < 2)
+		return -1;
+
+	NetPingIP = string_to_ip(argv[1]);
+	if (NetPingIP == 0)
+		return CMD_RET_USAGE;
+
+	result = NetLoop(PING);
+	if (result == -2) {
+		printf("Ethernet initialize failure\n");
+		return 1;
+	}else if (result < 0) {
+		printf("ping failed; host %s is not alive\n", argv[1]);
+		return 0;
+	}
+
+	printf("host %s is alive\n", argv[1]);
+
+	return 0;
+}
+
+U_BOOT_CMD(
+   checketh,   2,  1,  do_checketh,
+   "send ICMP ECHO_REQUEST to network host",
+   "pingAddress"
+);
 #endif
 
 #if defined(CONFIG_CMD_CDP)

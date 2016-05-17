@@ -339,6 +339,9 @@ int NetLoop(enum proto_t protocol)
 		eth_set_current();
 		if (eth_init(bd) < 0) {
 			eth_halt();
+            if (protocol == PING) {
+                return -2;
+            }
 			return -1;
 		}
 	} else
