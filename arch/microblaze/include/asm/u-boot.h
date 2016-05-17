@@ -20,5 +20,6 @@
 
 /* For image.h:image_check_target_arch() */
 #define IH_ARCH_DEFAULT IH_ARCH_MICROBLAZE
+#define CONFIG_SYS_BOOTM_LEN    (0x4000000)
 
 #endif	/* _U_BOOT_H_ */
