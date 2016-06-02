@@ -252,6 +252,9 @@ static int setup_phy(struct eth_device *dev)
 
 	/* Interface - look at tsec */
 	phydev = phy_connect(priv->bus, priv->phyaddr, dev, 0);
+	if (phydev == NULL) {
+		return 0;
+	}
 
 	phydev->supported &= supported;
 	phydev->advertising = phydev->supported;

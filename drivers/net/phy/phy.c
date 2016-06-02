@@ -620,7 +620,7 @@ static struct phy_device *get_phy_device(struct mii_dev *bus, int addr,
 int phy_reset(struct phy_device *phydev)
 {
 	int reg, reg2;
-	int timeout = 500;
+	int timeout = 20;
 	int devad = MDIO_DEVAD_NONE;
 
 #ifdef CONFIG_PHYLIB_10G
@@ -684,7 +684,7 @@ int phy_reset(struct phy_device *phydev)
 	debug("Waiting for Link to be up; Polling for SGMII core Reg \n");
 	reg2 = phy_read(phydev, devad, MII_LPA);
 
-	while(!(reg2 & 0x8000)) {
+	while(!(reg2 & 0x8000) && timeout--) {
 	  if (phy_write(phydev, devad, MII_BMCR, BMCR_RESET) < 0) {
 	    debug("PHY reset failed\n");
 	    return -1;
@@ -696,6 +696,11 @@ int phy_reset(struct phy_device *phydev)
 
 	  udelay(200000);
 	  reg2 = phy_read(phydev, devad, MII_LPA);
+	}
+
+	if (timeout <= 0) {
+		printf("Timeout!\n");
+		return -1;
 	}
 
 	return 0;
@@ -731,7 +736,10 @@ struct phy_device *phy_find_by_mask(struct mii_dev *bus, unsigned phy_mask,
 void phy_connect_dev(struct phy_device *phydev, struct eth_device *dev)
 {
 	/* Soft Reset the PHY */
-	phy_reset(phydev);
+	if (phy_reset(phydev) < 0) {
+		phydev->dev = NULL;
+		return ;
+	}
 	if (phydev->dev) {
 		printf("%s:%d is connected to %s.  Reconnecting to %s\n",
 				phydev->bus->name, phydev->addr,
@@ -751,6 +759,9 @@ struct phy_device *phy_connect(struct mii_dev *bus, int addr,
 		phy_connect_dev(phydev, dev);
 	else
 		printf("Could not get PHY for %s: addr %d\n", bus->name, addr);
+	if (phydev->dev == NULL) {
+		return NULL;
+	}
 	return phydev;
 }
 
